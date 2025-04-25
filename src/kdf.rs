@@ -21,7 +21,7 @@ pub trait Kdf {
 use hkdf::Hkdf;
 use sha2::{Sha256, Sha384, Sha512};
 
-struct HkdfSha256;
+pub struct HkdfSha256;
 
 impl Kdf for HkdfSha256 {
     const ID: [u8; 2] = [0x00, 0x01];
@@ -40,7 +40,7 @@ impl Kdf for HkdfSha256 {
     }
 }
 
-struct HkdfSha384;
+pub struct HkdfSha384;
 
 impl Kdf for HkdfSha384 {
     const ID: [u8; 2] = [0x00, 0x02];
@@ -59,7 +59,7 @@ impl Kdf for HkdfSha384 {
     }
 }
 
-struct HkdfSha512;
+pub struct HkdfSha512;
 
 impl Kdf for HkdfSha512 {
     const ID: [u8; 2] = [0x00, 0x03];

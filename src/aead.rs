@@ -31,7 +31,7 @@ impl Aead for Aes128Gcm {
     }
 }
 
-struct Aes256Gcm;
+pub struct Aes256Gcm;
 
 impl Aead for Aes256Gcm {
     const ID: [u8; 2] = [0x00, 0x02];
@@ -52,7 +52,7 @@ impl Aead for Aes256Gcm {
     }
 }
 
-struct ChaCha29Poly1305;
+pub struct ChaCha29Poly1305;
 
 impl Aead for ChaCha29Poly1305 {
     const ID: [u8; 2] = [0x00, 0x03];

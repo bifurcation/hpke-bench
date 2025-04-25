@@ -10,6 +10,8 @@ use aead::*;
 use kdf::*;
 use kem::*;
 
+use rand_core::CryptoRngCore;
+
 fn concat(parts: &[&[u8]]) -> Vec<u8> {
     let len = parts.iter().map(|x| x.len()).sum();
     let mut out = Vec::with_capacity(len);
@@ -202,8 +204,12 @@ where
         Context::new(key, base_nonce, exporter_secret)
     }
 
-    fn setup_base_s(pkR: &K::EncapsulationKey, info: &[u8]) -> (K::Ciphertext, Context<A, Sender>) {
-        let (shared_secret, enc) = K::encap(pkR);
+    fn setup_base_s(
+        rng: &mut impl CryptoRngCore,
+        pkR: &K::EncapsulationKey,
+        info: &[u8],
+    ) -> (K::Ciphertext, Context<A, Sender>) {
+        let (shared_secret, enc) = K::encap(rng, pkR);
         (
             enc,
             Self::key_schedule(Mode::Base, &shared_secret, info, None, None),
@@ -220,12 +226,13 @@ where
     }
 
     fn setup_psk_s(
+        rng: &mut impl CryptoRngCore,
         pkR: &K::EncapsulationKey,
         info: &[u8],
         psk: &[u8],
         psk_id: &[u8],
     ) -> (K::Ciphertext, Context<A, Sender>) {
-        let (shared_secret, enc) = K::encap(pkR);
+        let (shared_secret, enc) = K::encap(rng, pkR);
         (
             enc,
             Self::key_schedule(Mode::Psk, &shared_secret, info, Some(psk), Some(psk_id)),
