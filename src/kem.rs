@@ -337,8 +337,39 @@ where
     }
 }
 
-pub type DhkemP256Sha256 = Dhkem<P256, HkdfSha256>;
-pub type DhkemP384Sha384 = Dhkem<P384, HkdfSha384>;
-pub type DhkemP521Sha512 = Dhkem<P521, HkdfSha512>;
-pub type DhkemX25519Sha256 = Dhkem<X25519, HkdfSha256>;
-pub type DhkemX448Sha512 = Dhkem<X448, HkdfSha512>;
+pub type DhkemP256HkdfSha256 = Dhkem<P256, HkdfSha256>;
+pub type DhkemP384HkdfSha384 = Dhkem<P384, HkdfSha384>;
+pub type DhkemP521HkdfSha512 = Dhkem<P521, HkdfSha512>;
+pub type DhkemX25519HkdfSha256 = Dhkem<X25519, HkdfSha256>;
+pub type DhkemX448HkdfSha512 = Dhkem<X448, HkdfSha512>;
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn test<K>()
+    where
+        K: Kem,
+    {
+        let mut rng = rand::thread_rng();
+
+        let (dk, ek) = K::generate_key_pair(&mut rng);
+
+        let ekm = K::serialize_public_key(&ek);
+        assert_eq!(ekm.len(), K::N_PK);
+
+        let (ss_s, ct) = K::encap(&mut rng, &ek);
+        let ss_r = K::decap(&ct, &dk);
+        assert_eq!(ss_s, ss_r);
+        assert_eq!(ss_s.len(), K::N_SECRET);
+    }
+
+    #[test]
+    fn test_all() {
+        test::<DhkemP256HkdfSha256>();
+        test::<DhkemP384HkdfSha384>();
+        test::<DhkemP521HkdfSha512>();
+        test::<DhkemX25519HkdfSha256>();
+        test::<DhkemX448HkdfSha512>();
+    }
+}

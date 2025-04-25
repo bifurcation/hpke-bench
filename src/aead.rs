@@ -10,7 +10,7 @@ pub trait Aead {
 
 use aead::{Aead as _, KeyInit};
 
-struct Aes128Gcm;
+pub struct Aes128Gcm;
 
 impl Aead for Aes128Gcm {
     const ID: [u8; 2] = [0x00, 0x01];
@@ -47,14 +47,14 @@ impl Aead for Aes256Gcm {
 
     fn open(key: &[u8], nonce: &[u8], aad: &[u8], ct: &[u8]) -> Vec<u8> {
         let payload = aead::Payload { aad, msg: ct };
-        let cipher = aes_gcm::Aes128Gcm::new(key.into());
+        let cipher = aes_gcm::Aes256Gcm::new(key.into());
         cipher.decrypt(nonce.into(), payload).unwrap()
     }
 }
 
-pub struct ChaCha29Poly1305;
+pub struct ChaCha20Poly1305;
 
-impl Aead for ChaCha29Poly1305 {
+impl Aead for ChaCha20Poly1305 {
     const ID: [u8; 2] = [0x00, 0x03];
     const N_K: usize = 32;
     const N_N: usize = 12;
@@ -70,5 +70,34 @@ impl Aead for ChaCha29Poly1305 {
         let payload = aead::Payload { aad, msg: ct };
         let cipher = chacha20poly1305::ChaCha20Poly1305::new(key.into());
         cipher.decrypt(nonce.into(), payload).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn test<A>()
+    where
+        A: Aead,
+    {
+        let key = vec![0xA0; A::N_K];
+        let nonce = vec![0xB0; A::N_N];
+
+        let aad = b"I have heard the mermaids singing, each to each";
+        let pt = b"I do not think that they will sing to me";
+
+        let ct = A::seal(&key, &nonce, aad, pt);
+        assert_eq!(ct.len(), pt.len() + A::N_T);
+
+        let pt_out = A::open(&key, &nonce, aad, &ct);
+        assert_eq!(pt, pt_out.as_slice());
+    }
+
+    #[test]
+    fn test_all() {
+        test::<Aes128Gcm>();
+        test::<Aes256Gcm>();
+        test::<ChaCha20Poly1305>();
     }
 }

@@ -6,9 +6,9 @@ mod aead;
 mod kdf;
 mod kem;
 
-use aead::*;
-use kdf::*;
-use kem::*;
+pub use aead::*;
+pub use kdf::*;
+pub use kem::*;
 
 use rand_core::CryptoRngCore;
 
@@ -24,19 +24,26 @@ fn concat(parts: &[&[u8]]) -> Vec<u8> {
 }
 
 fn i2osp(n: usize, w: usize) -> Vec<u8> {
-    let mut val = vec![0; w];
-    for i in 0..w {
-        val[i] = (n >> (8 * (w - i - 1))) as u8;
+    let b = n.to_be_bytes();
+    let mut v = vec![0; w];
+
+    if b.len() < v.len() {
+        let start = v.len() - b.len();
+        v[start..].copy_from_slice(&b);
+    } else {
+        let start = b.len() - v.len();
+        v.copy_from_slice(&b[start..]);
     }
-    val
+
+    v
 }
 
-trait Role {}
+pub trait Role {}
 
-struct Sender;
+pub struct Sender;
 impl Role for Sender {}
 
-struct Receiver;
+pub struct Receiver;
 impl Role for Receiver {}
 
 #[derive(Copy, Clone)]
@@ -54,7 +61,7 @@ impl From<Mode> for u8 {
     }
 }
 
-struct Context<A, R>
+pub struct Context<A, R>
 where
     A: Aead,
     R: Role,
@@ -88,11 +95,14 @@ where
     // suite_id.
 
     fn increment_seq(&mut self) {
+        // This will never happen in practice, because integers are small
+        /*
         if self.seq >= (1 << (8 * A::N_N)) - 1 {
-            // This will never happen in practice, because integers are small
             panic!("Message limit reached");
         }
+        */
 
+        // Instead, just check for integer overflow
         self.seq = self.seq.checked_add(1).unwrap();
     }
 
@@ -123,13 +133,13 @@ where
 {
     fn open(&mut self, aad: &[u8], ct: &[u8]) -> Vec<u8> {
         let nonce = self.compute_nonce();
-        let pt = A::seal(&self.key, &nonce, aad, ct);
+        let pt = A::open(&self.key, &nonce, aad, ct);
         self.increment_seq();
         pt
     }
 }
 
-struct Hpke<K, H, A>
+pub struct Hpke<K, H, A>
 where
     K: Kem,
     H: Kdf,
@@ -204,7 +214,7 @@ where
         Context::new(key, base_nonce, exporter_secret)
     }
 
-    fn setup_base_s(
+    pub fn setup_base_s(
         rng: &mut impl CryptoRngCore,
         pkR: &K::EncapsulationKey,
         info: &[u8],
@@ -216,7 +226,7 @@ where
         )
     }
 
-    fn setup_base_r(
+    pub fn setup_base_r(
         enc: &K::Ciphertext,
         skR: &K::DecapsulationKey,
         info: &[u8],
@@ -225,7 +235,7 @@ where
         Self::key_schedule(Mode::Base, &shared_secret, info, None, None)
     }
 
-    fn setup_psk_s(
+    pub fn setup_psk_s(
         rng: &mut impl CryptoRngCore,
         pkR: &K::EncapsulationKey,
         info: &[u8],
@@ -239,7 +249,7 @@ where
         )
     }
 
-    fn setup_psk_r(
+    pub fn setup_psk_r(
         enc: &K::Ciphertext,
         skR: &K::DecapsulationKey,
         info: &[u8],
@@ -248,5 +258,121 @@ where
     ) -> Context<A, Receiver> {
         let shared_secret = K::decap(enc, skR);
         Self::key_schedule(Mode::Psk, &shared_secret, info, Some(psk), Some(psk_id))
+    }
+
+    pub fn seal_base(
+        rng: &mut impl CryptoRngCore,
+        pkR: &K::EncapsulationKey,
+        info: &[u8],
+        aad: &[u8],
+        pt: &[u8],
+    ) -> (K::Ciphertext, Vec<u8>) {
+        let (enc, mut ctx) = Self::setup_base_s(rng, pkR, info);
+        let ct = ctx.seal(aad, pt);
+        (enc, ct)
+    }
+
+    pub fn open_base(
+        enc: &K::Ciphertext,
+        skR: &K::DecapsulationKey,
+        info: &[u8],
+        aad: &[u8],
+        ct: &[u8],
+    ) -> Vec<u8> {
+        let mut ctx = Self::setup_base_r(enc, skR, info);
+        ctx.open(aad, ct)
+    }
+
+    pub fn seal_psk(
+        rng: &mut impl CryptoRngCore,
+        pkR: &K::EncapsulationKey,
+        info: &[u8],
+        aad: &[u8],
+        pt: &[u8],
+        psk: &[u8],
+        psk_id: &[u8],
+    ) -> (K::Ciphertext, Vec<u8>) {
+        let (enc, mut ctx) = Self::setup_psk_s(rng, pkR, info, psk, psk_id);
+        let ct = ctx.seal(aad, pt);
+        (enc, ct)
+    }
+
+    pub fn open_psk(
+        enc: &K::Ciphertext,
+        skR: &K::DecapsulationKey,
+        info: &[u8],
+        aad: &[u8],
+        ct: &[u8],
+        psk: &[u8],
+        psk_id: &[u8],
+    ) -> Vec<u8> {
+        let mut ctx = Self::setup_psk_r(enc, skR, info, psk, psk_id);
+        ctx.open(aad, ct)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn base<K, H, A>()
+    where
+        K: Kem,
+        H: Kdf,
+        A: Aead,
+    {
+        let mut rng = rand::thread_rng();
+
+        let info = b"And turning toward the window, should say";
+        let aad = b"That is not it at all";
+        let pt = b"That is not what I meant, at all";
+
+        let (dk, ek) = K::generate_key_pair(&mut rng);
+        let (enc, ct) = Hpke::<K, H, A>::seal_base(&mut rng, &ek, info, aad, pt);
+        assert_eq!(ct.len(), pt.len() + A::N_T);
+
+        let pt_out = Hpke::<K, H, A>::open_base(&enc, &dk, info, aad, &ct);
+        assert_eq!(pt, pt_out.as_slice());
+    }
+
+    #[test]
+    fn base_all() {
+        base::<DhkemP256HkdfSha256, HkdfSha256, Aes128Gcm>();
+        base::<DhkemP384HkdfSha384, HkdfSha384, Aes256Gcm>();
+        base::<DhkemP521HkdfSha512, HkdfSha512, Aes256Gcm>();
+        base::<DhkemX25519HkdfSha256, HkdfSha256, ChaCha20Poly1305>();
+        base::<DhkemX448HkdfSha512, HkdfSha512, ChaCha20Poly1305>();
+    }
+
+    fn psk<K, H, A>()
+    where
+        K: Kem,
+        H: Kdf,
+        A: Aead,
+    {
+        let mut rng = rand::thread_rng();
+
+        let info = b"And turning toward the window, should say";
+        let aad = b"That is not it at all";
+        let pt = b"That is not what I meant, at all";
+
+        let psk = b"I should have been a pair of ragged claws";
+        let psk_id = b"Scuttling across the floors of silent seas";
+
+        let (dk, ek) = K::generate_key_pair(&mut rng);
+        let (enc, ct) = Hpke::<K, H, A>::seal_psk(&mut rng, &ek, info, aad, pt, psk, psk_id);
+        assert_eq!(ct.len(), pt.len() + A::N_T);
+
+        let pt_out = Hpke::<K, H, A>::open_psk(&enc, &dk, info, aad, &ct, psk, psk_id);
+        assert_eq!(pt, pt_out.as_slice());
+    }
+
+    #[test]
+    fn psk_all() {
+        psk::<DhkemP256HkdfSha256, HkdfSha256, Aes128Gcm>();
+        psk::<DhkemP384HkdfSha384, HkdfSha384, Aes256Gcm>();
+        psk::<DhkemP521HkdfSha512, HkdfSha512, Aes256Gcm>();
+        psk::<DhkemX25519HkdfSha256, HkdfSha256, ChaCha20Poly1305>();
+        psk::<DhkemX448HkdfSha512, HkdfSha512, ChaCha20Poly1305>();
     }
 }
