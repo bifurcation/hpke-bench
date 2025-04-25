@@ -10,6 +10,7 @@ mod xof;
 pub use aead::*;
 pub use kdf::*;
 pub use kem::*;
+pub use xof::*;
 
 use rand_core::CryptoRngCore;
 
@@ -366,7 +367,99 @@ where
     }
 }
 
-pub type Hpke<K, H, A> = Instance<K, Rfc9180<H>, A>;
+pub struct XofWithLabel<X>
+where
+    X: Xof,
+{
+    _xof: core::marker::PhantomData<X>,
+}
+
+impl<X> KeySchedule for XofWithLabel<X>
+where
+    X: Xof,
+{
+    const ID: [u8; 2] = X::ID;
+    const N_H: usize = X::N_H;
+
+    fn key_schedule(
+        suite_id: [u8; 10],
+        mode: Mode,
+        shared_secret: &[u8],
+        info: &[u8],
+        psk: &[u8],
+        psk_id: &[u8],
+        key_size: usize,
+        nonce_size: usize,
+    ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        // https://mailarchive.ietf.org/arch/msg/cfrg/3RzIoQs0u5aw-uywoQQoY2gJtbM/
+        //
+        // k = XOF.Absorb(psk || zz || "hpke key" || ctx).XOF.Squeeze(N_k)
+        // n = XOF.Absorb(psk || zz || "hpke nonce" || ctx).XOF.Squeeze(N_n)
+        // s_exp = XOF.Absorb(psk || zz || "hpke exp" || ctx).XOF.Squeeze(N_h)
+        //
+        // [RLB: Rearranged to put `ctx` before the usage label]
+
+        let mut xof = X::default();
+        // Secrets
+        xof.absorb(psk).absorb(shared_secret);
+        // Context
+        xof.absorb(b"HPKE-v1")
+            .absorb(&[u8::from(mode)])
+            .length_prefixed_absorb(psk_id)
+            .length_prefixed_absorb(info);
+
+        let key = xof.clone().absorb(b"hpke key").squeeze(key_size);
+        let base_nonce = xof.clone().absorb(b"hpke nonce").squeeze(nonce_size);
+        let exporter_secret = xof.clone().absorb(b"hpke exp").squeeze(Self::N_H);
+
+        (key, base_nonce, exporter_secret)
+    }
+}
+
+pub struct XofFlat<X>
+where
+    X: Xof,
+{
+    _xof: core::marker::PhantomData<X>,
+}
+
+impl<X> KeySchedule for XofFlat<X>
+where
+    X: Xof,
+{
+    const ID: [u8; 2] = X::ID;
+    const N_H: usize = X::N_H;
+
+    fn key_schedule(
+        suite_id: [u8; 10],
+        mode: Mode,
+        shared_secret: &[u8],
+        info: &[u8],
+        psk: &[u8],
+        psk_id: &[u8],
+        key_size: usize,
+        nonce_size: usize,
+    ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        // XOF.absorb(psk || zz || ctx)
+        // key || base_nonce || exporter_secret = XOF.squeeze()
+
+        let mut xof = X::default();
+        xof.absorb(psk)
+            .absorb(shared_secret)
+            .absorb(b"HPKE-v1")
+            .absorb(&[u8::from(mode)])
+            .length_prefixed_absorb(psk_id)
+            .length_prefixed_absorb(info);
+
+        let data = xof.squeeze(key_size + nonce_size + Self::N_H);
+
+        let key = data[..key_size].to_vec();
+        let base_nonce = data[key_size..(key_size + nonce_size)].to_vec();
+        let exporter_secret = data[(key_size + nonce_size)..].to_vec();
+
+        (key, base_nonce, exporter_secret)
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -413,5 +506,11 @@ mod test {
         test::<DhkemX448HkdfSha512, Rfc9180<HkdfSha512>, ChaCha20Poly1305>();
 
         test::<DhkemX25519HkdfSha256, Rfc9180<HkdfSha3_256>, ChaCha20Poly1305>();
+
+        test::<DhkemX25519HkdfSha256, XofWithLabel<Shake128>, ChaCha20Poly1305>();
+        test::<DhkemX25519HkdfSha256, XofWithLabel<TurboShake128>, ChaCha20Poly1305>();
+
+        test::<DhkemX25519HkdfSha256, XofFlat<Shake128>, ChaCha20Poly1305>();
+        test::<DhkemX25519HkdfSha256, XofFlat<TurboShake128>, ChaCha20Poly1305>();
     }
 }
