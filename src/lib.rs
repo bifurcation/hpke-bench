@@ -2,6 +2,14 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
+mod aead;
+mod kdf;
+mod kem;
+
+use aead::*;
+use kdf::*;
+use kem::*;
+
 fn concat(parts: &[&[u8]]) -> Vec<u8> {
     let len = parts.iter().map(|x| x.len()).sum();
     let mut out = Vec::with_capacity(len);
@@ -19,50 +27,6 @@ fn i2osp(n: usize, w: usize) -> Vec<u8> {
         val[i] = (n >> (8 * (w - i - 1))) as u8;
     }
     val
-}
-
-trait Kem {
-    const N_SECRET: usize;
-    const N_ENC: usize;
-    const N_PK: usize;
-    const N_SK: usize;
-
-    type EncapsulationKey;
-    type DecapsulationKey;
-    type Ciphertext;
-
-    fn generate_key_pair(/* todo */) -> (Self::DecapsulationKey, Self::EncapsulationKey);
-    fn derive_key_pair(ikm: &[u8]) -> (Self::DecapsulationKey, Self::EncapsulationKey);
-    fn serialize_public_key(pkX: &Self::EncapsulationKey) -> Vec<u8>;
-    fn deserialize_public_key(pkXm: &[u8]) -> Self::EncapsulationKey;
-
-    fn encap(pkR: &Self::EncapsulationKey) -> (Vec<u8>, Self::Ciphertext);
-    fn decap(enc: &Self::Ciphertext, skR: &Self::DecapsulationKey) -> Vec<u8>;
-}
-
-trait Kdf {
-    const N_H: usize;
-    fn extract(salt: &[u8], ikm: &[u8]) -> Vec<u8>;
-    fn expand(prk: &[u8], info: &[u8], L: usize) -> Vec<u8>;
-
-    fn labeled_extract(suite_id: &[u8], salt: &[u8], label: &[u8], ikm: &[u8]) -> Vec<u8> {
-        let labeled_ikm = concat(&[b"HPKE-v1", suite_id, label, ikm]);
-        Self::extract(salt, &labeled_ikm)
-    }
-
-    fn labeled_expand(suite_id: &[u8], prk: &[u8], label: &[u8], info: &[u8], L: usize) -> Vec<u8> {
-        let labeled_info = concat(&[&i2osp(L, 2), b"HPKE-v1", suite_id, label, info]);
-        Self::expand(prk, &labeled_info, L)
-    }
-}
-
-trait Aead {
-    const N_K: usize;
-    const N_N: usize;
-    const N_T: usize;
-
-    fn seal(key: &[u8], nonce: &[u8], aad: &[u8], pt: &[u8], ct: &mut [u8]);
-    fn open(key: &[u8], nonce: &[u8], aad: &[u8], ct: &[u8], pt: &mut [u8]);
 }
 
 trait Role {}
@@ -178,8 +142,15 @@ where
     H: Kdf,
     A: Aead,
 {
-    fn suite_id() -> [u8; 7] {
-        todo!();
+    fn suite_id() -> [u8; 10] {
+        let mut suite_id = [0; 10];
+
+        suite_id[0..4].copy_from_slice(b"HPKE");
+        suite_id[4..6].copy_from_slice(&K::ID);
+        suite_id[6..8].copy_from_slice(&H::ID);
+        suite_id[8..10].copy_from_slice(&A::ID);
+
+        suite_id
     }
 
     fn verify_psk_inputs(mode: Mode, psk: Option<&[u8]>, psk_id: Option<&[u8]>) {
