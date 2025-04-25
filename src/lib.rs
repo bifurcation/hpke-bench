@@ -107,10 +107,11 @@ impl<A> Context<A, Sender>
 where
     A: Aead,
 {
-    fn seal(&mut self, aad: &[u8], pt: &[u8], ct: &mut [u8]) {
+    fn seal(&mut self, aad: &[u8], pt: &[u8]) -> Vec<u8> {
         let nonce = self.compute_nonce();
-        A::seal(&self.key, &nonce, aad, pt, ct);
+        let ct = A::seal(&self.key, &nonce, aad, pt);
         self.increment_seq();
+        ct
     }
 }
 
@@ -118,10 +119,11 @@ impl<A> Context<A, Receiver>
 where
     A: Aead,
 {
-    fn open(&mut self, aad: &[u8], ct: &[u8], pt: &mut [u8]) {
+    fn open(&mut self, aad: &[u8], ct: &[u8]) -> Vec<u8> {
         let nonce = self.compute_nonce();
-        A::seal(&self.key, &nonce, aad, ct, pt);
+        let pt = A::seal(&self.key, &nonce, aad, ct);
         self.increment_seq();
+        pt
     }
 }
 
