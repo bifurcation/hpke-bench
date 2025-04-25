@@ -5,6 +5,7 @@
 mod aead;
 mod kdf;
 mod kem;
+mod xof;
 
 pub use aead::*;
 pub use kdf::*;
@@ -47,7 +48,7 @@ pub struct Receiver;
 impl Role for Receiver {}
 
 #[derive(Copy, Clone)]
-enum Mode {
+pub enum Mode {
     Base,
     Psk,
 }
@@ -139,21 +140,37 @@ where
     }
 }
 
-pub struct Hpke<K, H, A>
+pub trait KeySchedule {
+    const ID: [u8; 2];
+    const N_H: usize;
+
+    fn key_schedule(
+        suite_id: [u8; 10],
+        mode: Mode,
+        shared_secret: &[u8],
+        info: &[u8],
+        psk: &[u8],
+        psk_id: &[u8],
+        key_size: usize,
+        nonce_size: usize,
+    ) -> (Vec<u8>, Vec<u8>, Vec<u8>);
+}
+
+pub struct Instance<K, KS, A>
 where
     K: Kem,
-    H: Kdf,
+    KS: KeySchedule,
     A: Aead,
 {
     _kem: core::marker::PhantomData<K>,
-    _kdf: core::marker::PhantomData<H>,
+    _key_schedule: core::marker::PhantomData<KS>,
     _aead: core::marker::PhantomData<A>,
 }
 
-impl<K, H, A> Hpke<K, H, A>
+impl<K, KS, A> Instance<K, KS, A>
 where
     K: Kem,
-    H: Kdf,
+    KS: KeySchedule,
     A: Aead,
 {
     fn suite_id() -> [u8; 10] {
@@ -161,7 +178,7 @@ where
 
         suite_id[0..4].copy_from_slice(b"HPKE");
         suite_id[4..6].copy_from_slice(&K::ID);
-        suite_id[6..8].copy_from_slice(&H::ID);
+        suite_id[6..8].copy_from_slice(&KS::ID);
         suite_id[8..10].copy_from_slice(&A::ID);
 
         suite_id
@@ -190,26 +207,19 @@ where
     ) -> Context<A, R> {
         Self::verify_psk_inputs(mode, psk, psk_id);
 
-        let suite_id = Self::suite_id();
         let psk = psk.unwrap_or_default();
         let psk_id = psk_id.unwrap_or_default();
 
-        let psk_id_hash = H::labeled_extract(&suite_id, &[], b"psk_id_hash", psk_id);
-        let info_hash = H::labeled_extract(&suite_id, &[], b"info_hash", info);
-        let key_schedule_context = concat(&[&[u8::from(mode)], &psk_id_hash, &info_hash]);
-
-        let secret = H::labeled_extract(&suite_id, shared_secret, b"secret", psk);
-
-        let key = H::labeled_expand(&suite_id, &secret, b"key", &key_schedule_context, A::N_K);
-        let base_nonce = H::labeled_expand(
-            &suite_id,
-            &secret,
-            b"base_nonce",
-            &key_schedule_context,
+        let (key, base_nonce, exporter_secret) = KS::key_schedule(
+            Self::suite_id(),
+            mode,
+            shared_secret,
+            info,
+            psk,
+            psk_id,
+            A::N_K,
             A::N_N,
         );
-        let exporter_secret =
-            H::labeled_expand(&suite_id, &secret, b"exp", &key_schedule_context, H::N_H);
 
         Context::new(key, base_nonce, exporter_secret)
     }
@@ -311,43 +321,61 @@ where
     }
 }
 
+pub struct Rfc9180<K>
+where
+    K: Kdf,
+{
+    _kdf: core::marker::PhantomData<K>,
+}
+
+impl<K> KeySchedule for Rfc9180<K>
+where
+    K: Kdf,
+{
+    const ID: [u8; 2] = K::ID;
+    const N_H: usize = K::N_H;
+
+    fn key_schedule(
+        suite_id: [u8; 10],
+        mode: Mode,
+        shared_secret: &[u8],
+        info: &[u8],
+        psk: &[u8],
+        psk_id: &[u8],
+        key_size: usize,
+        nonce_size: usize,
+    ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        let psk_id_hash = K::labeled_extract(&suite_id, &[], b"psk_id_hash", psk_id);
+        let info_hash = K::labeled_extract(&suite_id, &[], b"info_hash", info);
+        let key_schedule_context = concat(&[&[u8::from(mode)], &psk_id_hash, &info_hash]);
+
+        let secret = K::labeled_extract(&suite_id, shared_secret, b"secret", psk);
+
+        let key = K::labeled_expand(&suite_id, &secret, b"key", &key_schedule_context, key_size);
+        let base_nonce = K::labeled_expand(
+            &suite_id,
+            &secret,
+            b"base_nonce",
+            &key_schedule_context,
+            nonce_size,
+        );
+        let exporter_secret =
+            K::labeled_expand(&suite_id, &secret, b"exp", &key_schedule_context, Self::N_H);
+
+        (key, base_nonce, exporter_secret)
+    }
+}
+
+pub type Hpke<K, H, A> = Instance<K, Rfc9180<H>, A>;
+
 #[cfg(test)]
 mod test {
     use super::*;
 
-    fn base<K, H, A>()
+    fn test<K, KS, A>()
     where
         K: Kem,
-        H: Kdf,
-        A: Aead,
-    {
-        let mut rng = rand::thread_rng();
-
-        let info = b"And turning toward the window, should say";
-        let aad = b"That is not it at all";
-        let pt = b"That is not what I meant, at all";
-
-        let (dk, ek) = K::generate_key_pair(&mut rng);
-        let (enc, ct) = Hpke::<K, H, A>::seal_base(&mut rng, &ek, info, aad, pt);
-        assert_eq!(ct.len(), pt.len() + A::N_T);
-
-        let pt_out = Hpke::<K, H, A>::open_base(&enc, &dk, info, aad, &ct);
-        assert_eq!(pt, pt_out.as_slice());
-    }
-
-    #[test]
-    fn base_all() {
-        base::<DhkemP256HkdfSha256, HkdfSha256, Aes128Gcm>();
-        base::<DhkemP384HkdfSha384, HkdfSha384, Aes256Gcm>();
-        base::<DhkemP521HkdfSha512, HkdfSha512, Aes256Gcm>();
-        base::<DhkemX25519HkdfSha256, HkdfSha256, ChaCha20Poly1305>();
-        base::<DhkemX448HkdfSha512, HkdfSha512, ChaCha20Poly1305>();
-    }
-
-    fn psk<K, H, A>()
-    where
-        K: Kem,
-        H: Kdf,
+        KS: KeySchedule,
         A: Aead,
     {
         let mut rng = rand::thread_rng();
@@ -360,19 +388,30 @@ mod test {
         let psk_id = b"Scuttling across the floors of silent seas";
 
         let (dk, ek) = K::generate_key_pair(&mut rng);
-        let (enc, ct) = Hpke::<K, H, A>::seal_psk(&mut rng, &ek, info, aad, pt, psk, psk_id);
+
+        // Base
+        let (enc, ct) = Instance::<K, KS, A>::seal_base(&mut rng, &ek, info, aad, pt);
         assert_eq!(ct.len(), pt.len() + A::N_T);
 
-        let pt_out = Hpke::<K, H, A>::open_psk(&enc, &dk, info, aad, &ct, psk, psk_id);
+        let pt_out = Instance::<K, KS, A>::open_base(&enc, &dk, info, aad, &ct);
+        assert_eq!(pt, pt_out.as_slice());
+
+        // PSK
+        let (enc, ct) = Instance::<K, KS, A>::seal_psk(&mut rng, &ek, info, aad, pt, psk, psk_id);
+        assert_eq!(ct.len(), pt.len() + A::N_T);
+
+        let pt_out = Instance::<K, KS, A>::open_psk(&enc, &dk, info, aad, &ct, psk, psk_id);
         assert_eq!(pt, pt_out.as_slice());
     }
 
     #[test]
-    fn psk_all() {
-        psk::<DhkemP256HkdfSha256, HkdfSha256, Aes128Gcm>();
-        psk::<DhkemP384HkdfSha384, HkdfSha384, Aes256Gcm>();
-        psk::<DhkemP521HkdfSha512, HkdfSha512, Aes256Gcm>();
-        psk::<DhkemX25519HkdfSha256, HkdfSha256, ChaCha20Poly1305>();
-        psk::<DhkemX448HkdfSha512, HkdfSha512, ChaCha20Poly1305>();
+    fn test_all() {
+        test::<DhkemP256HkdfSha256, Rfc9180<HkdfSha256>, Aes128Gcm>();
+        test::<DhkemP384HkdfSha384, Rfc9180<HkdfSha384>, Aes256Gcm>();
+        test::<DhkemP521HkdfSha512, Rfc9180<HkdfSha512>, Aes256Gcm>();
+        test::<DhkemX25519HkdfSha256, Rfc9180<HkdfSha256>, ChaCha20Poly1305>();
+        test::<DhkemX448HkdfSha512, Rfc9180<HkdfSha512>, ChaCha20Poly1305>();
+
+        test::<DhkemX25519HkdfSha256, Rfc9180<HkdfSha3_256>, ChaCha20Poly1305>();
     }
 }

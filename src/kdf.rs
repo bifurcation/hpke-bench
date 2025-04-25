@@ -20,6 +20,7 @@ pub trait Kdf {
 
 use hkdf::Hkdf;
 use sha2::{Sha256, Sha384, Sha512};
+use sha3::Sha3_256;
 
 pub struct HkdfSha256;
 
@@ -73,6 +74,25 @@ impl Kdf for HkdfSha512 {
     fn expand(prk: &[u8], info: &[u8], L: usize) -> Vec<u8> {
         let mut okm = vec![0; L];
         let hk = Hkdf::<Sha512>::from_prk(prk).unwrap();
+        hk.expand(info, &mut okm).unwrap();
+        okm
+    }
+}
+
+pub struct HkdfSha3_256;
+
+impl Kdf for HkdfSha3_256 {
+    const ID: [u8; 2] = [0x00, 0x04];
+    const N_H: usize = 32;
+
+    fn extract(salt: &[u8], ikm: &[u8]) -> Vec<u8> {
+        let (prk, _) = Hkdf::<Sha3_256>::extract(Some(salt), ikm);
+        prk.to_vec()
+    }
+
+    fn expand(prk: &[u8], info: &[u8], L: usize) -> Vec<u8> {
+        let mut okm = vec![0; L];
+        let hk = Hkdf::<Sha3_256>::from_prk(prk).unwrap();
         hk.expand(info, &mut okm).unwrap();
         okm
     }
