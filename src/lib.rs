@@ -504,6 +504,7 @@ mod test {
         test::<DhkemP521HkdfSha512, Rfc9180<HkdfSha512>, Aes256Gcm>();
         test::<DhkemX25519HkdfSha256, Rfc9180<HkdfSha256>, ChaCha20Poly1305>();
         test::<DhkemX448HkdfSha512, Rfc9180<HkdfSha512>, ChaCha20Poly1305>();
+        test::<MlKem768, Rfc9180<HkdfSha256>, Aes128Gcm>();
 
         test::<DhkemX25519HkdfSha256, Rfc9180<HkdfSha3_256>, ChaCha20Poly1305>();
 

@@ -343,6 +343,57 @@ pub type DhkemP521HkdfSha512 = Dhkem<P521, HkdfSha512>;
 pub type DhkemX25519HkdfSha256 = Dhkem<X25519, HkdfSha256>;
 pub type DhkemX448HkdfSha512 = Dhkem<X448, HkdfSha512>;
 
+pub struct MlKem768;
+
+impl Kem for MlKem768 {
+    const ID: [u8; 2] = [0x00, 0x41];
+
+    const N_SECRET: usize = 32;
+    const N_ENC: usize = 1088;
+    const N_PK: usize = 1184;
+    const N_SK: usize = 64;
+
+    type EncapsulationKey = <ml_kem::MlKem768 as ml_kem::KemCore>::EncapsulationKey;
+    type DecapsulationKey = <ml_kem::MlKem768 as ml_kem::KemCore>::DecapsulationKey;
+    type Ciphertext = ml_kem::Ciphertext<ml_kem::MlKem768>;
+
+    fn generate_key_pair(
+        rng: &mut impl CryptoRngCore,
+    ) -> (Self::DecapsulationKey, Self::EncapsulationKey) {
+        <ml_kem::MlKem768 as ml_kem::KemCore>::generate(rng)
+    }
+
+    fn derive_key_pair(ikm: &[u8]) -> (Self::DecapsulationKey, Self::EncapsulationKey) {
+        todo!();
+    }
+
+    fn serialize_public_key(pkX: &Self::EncapsulationKey) -> Vec<u8> {
+        use ml_kem::EncodedSizeUser;
+        pkX.as_bytes().to_vec()
+    }
+
+    fn deserialize_public_key(pkXm: &[u8]) -> Self::EncapsulationKey {
+        use ml_kem::EncodedSizeUser;
+        let enc = ml_kem::Encoded::<Self::EncapsulationKey>::try_from(pkXm).unwrap();
+        Self::EncapsulationKey::from_bytes(&enc)
+    }
+
+    fn encap(
+        rng: &mut impl CryptoRngCore,
+        pkR: &Self::EncapsulationKey,
+    ) -> (Vec<u8>, Self::Ciphertext) {
+        use ml_kem::kem::Encapsulate;
+        let (ct, ss) = pkR.encapsulate(rng).unwrap();
+        (ss.to_vec(), ct)
+    }
+
+    fn decap(enc: &Self::Ciphertext, skR: &Self::DecapsulationKey) -> Vec<u8> {
+        use ml_kem::kem::Decapsulate;
+        let ss = skR.decapsulate(enc).unwrap();
+        ss.to_vec()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -371,5 +422,6 @@ mod test {
         test::<DhkemP521HkdfSha512>();
         test::<DhkemX25519HkdfSha256>();
         test::<DhkemX448HkdfSha512>();
+        test::<MlKem768>();
     }
 }

@@ -57,6 +57,9 @@ where
     });
 }
 
+// For brevity, to avoid line wrapping below
+type X25519 = DhkemX25519HkdfSha256;
+
 pub fn criterion_benchmark(c: &mut Criterion) {
     // Benchmark the raw key schedule
     bench_key_schedule::<Rfc9180<HkdfSha256>>(c, "rfc_sha2");
@@ -66,32 +69,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     bench_key_schedule::<XofFlat<Shake128>>(c, "shake_flat");
     bench_key_schedule::<XofFlat<TurboShake128>>(c, "turboshake_flat");
 
-    // Benchmark the key schedule functions in context
-    bench_hpke::<DhkemP256HkdfSha256, Rfc9180<HkdfSha256>, Aes128Gcm>(c, "p256");
-    bench_hpke::<DhkemP384HkdfSha384, Rfc9180<HkdfSha384>, Aes256Gcm>(c, "p384");
-    bench_hpke::<DhkemP521HkdfSha512, Rfc9180<HkdfSha512>, Aes256Gcm>(c, "p521");
-    bench_hpke::<DhkemX25519HkdfSha256, Rfc9180<HkdfSha256>, ChaCha20Poly1305>(c, "x25519");
-    bench_hpke::<DhkemX448HkdfSha512, Rfc9180<HkdfSha512>, ChaCha20Poly1305>(c, "x448");
+    // Benchmark the key schedule functions in context with X25519
+    bench_hpke::<X25519, Rfc9180<HkdfSha256>, ChaCha20Poly1305>(c, "x_sha2");
+    bench_hpke::<X25519, Rfc9180<HkdfSha3_256>, ChaCha20Poly1305>(c, "x_sha3");
+    bench_hpke::<X25519, XofWithLabel<Shake128>, ChaCha20Poly1305>(c, "x_shake_label");
+    bench_hpke::<X25519, XofWithLabel<TurboShake128>, ChaCha20Poly1305>(c, "x_turboshake_label");
+    bench_hpke::<X25519, XofFlat<Shake128>, ChaCha20Poly1305>(c, "x_shake_flat");
+    bench_hpke::<X25519, XofFlat<TurboShake128>, ChaCha20Poly1305>(c, "x_turboshake_flat");
 
-    bench_hpke::<DhkemX25519HkdfSha256, Rfc9180<HkdfSha3_256>, ChaCha20Poly1305>(c, "x25519_sha3");
-
-    bench_hpke::<DhkemX25519HkdfSha256, XofWithLabel<Shake128>, ChaCha20Poly1305>(
-        c,
-        "x25519_shake_label",
-    );
-    bench_hpke::<DhkemX25519HkdfSha256, XofWithLabel<TurboShake128>, ChaCha20Poly1305>(
-        c,
-        "x25519_turboshake_label",
-    );
-
-    bench_hpke::<DhkemX25519HkdfSha256, XofFlat<Shake128>, ChaCha20Poly1305>(
-        c,
-        "x25519_shake_flat",
-    );
-    bench_hpke::<DhkemX25519HkdfSha256, XofFlat<TurboShake128>, ChaCha20Poly1305>(
-        c,
-        "x25519_turboshake_flat",
-    );
+    // Benchmark the key schedule functions in context with ML-KEM-768
+    bench_hpke::<MlKem768, Rfc9180<HkdfSha256>, ChaCha20Poly1305>(c, "m_sha2");
+    bench_hpke::<MlKem768, Rfc9180<HkdfSha3_256>, ChaCha20Poly1305>(c, "m_sha3");
+    bench_hpke::<MlKem768, XofWithLabel<Shake128>, ChaCha20Poly1305>(c, "m_shake_label");
+    bench_hpke::<MlKem768, XofWithLabel<TurboShake128>, ChaCha20Poly1305>(c, "m_turboshake_label");
+    bench_hpke::<MlKem768, XofFlat<Shake128>, ChaCha20Poly1305>(c, "m_shake_flat");
+    bench_hpke::<MlKem768, XofFlat<TurboShake128>, ChaCha20Poly1305>(c, "m_turboshake_flat");
 }
 
 criterion_group!(benches, criterion_benchmark);
