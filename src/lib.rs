@@ -400,11 +400,11 @@ where
         // [RLB: Rearranged to put `ctx` before the usage label]
 
         let mut xof = X::default();
-        // Secrets
-        xof.absorb(psk).absorb(shared_secret);
-        // Context
-        xof.absorb(b"HPKE-v1")
+        xof.length_prefixed_absorb(psk)
+            .length_prefixed_absorb(shared_secret)
+            .absorb(b"HPKE-v1")
             .absorb(&[u8::from(mode)])
+            .absorb(&suite_id)
             .length_prefixed_absorb(psk_id)
             .length_prefixed_absorb(info);
 
@@ -444,10 +444,11 @@ where
         // key || base_nonce || exporter_secret = XOF.squeeze()
 
         let mut xof = X::default();
-        xof.absorb(psk)
-            .absorb(shared_secret)
+        xof.length_prefixed_absorb(psk)
+            .length_prefixed_absorb(shared_secret)
             .absorb(b"HPKE-v1")
             .absorb(&[u8::from(mode)])
+            .absorb(&suite_id)
             .length_prefixed_absorb(psk_id)
             .length_prefixed_absorb(info);
 

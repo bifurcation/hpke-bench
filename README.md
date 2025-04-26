@@ -40,12 +40,12 @@ Measurements reflect the mean value measured by Criterion.
 |----------------------|----------------|------------|---------------|------------------|------------------|
 | RFC                  | HKDF-SHA256    | 13.018 µs  | 56.667 µs     | 37.105 µs        | 44.695 µs        |
 | RFC                  | HKDF-SHA3\_256 | 10.621 µs  | 57.520 µs     | 38.055 µs        | 45.664 µs        |
-| XOF with label       | SHAKE128       | 4.3673 µs  | 51.536 µs     | 32.161 µs        | 39.674 µs        |
-| XOF with label       | TurboSHAKE128  | 2.3762 µs  | 50.927 µs     | 31.276 µs        | 38.878 µs        |
-| XOF with label       | HKDF-SHA256*   | 10.065 µs  | 54.467 µs     | 35.387 µs        | 43.539 µs        |
-| XOF with length      | SHAKE128       | 3.4692 µs  | 50.662 µs     | 31.134 µs        | 38.734 µs        |
-| XOF with length      | TurboSHAKE128  | 1.8673 µs  | 50.337 µs     | 31.418 µs        | 39.069 µs        |
-| XOF with length      | HKDF-SHA256*   | 8.5668 µs  | 52.401 µs     | 33.041 µs        | 41.301 µs        |
+| XOF with label       | SHAKE128       | 4.3962 µs  | 52.200 µs     | 32.883 µs        | 40.577 µs        |
+| XOF with label       | TurboSHAKE128  | 2.4187 µs  | 51.101 µs     | 31.772 µs        | 39.483 µs        |
+| XOF with label       | HKDF-SHA256*   | 10.151 µs  | 54.921 µs     | 35.184 µs        | 43.498 µs        |
+| XOF with length      | SHAKE128       | 3.5342 µs  | 50.754 µs     | 30.865 µs        | 39.071 µs        |
+| XOF with length      | TurboSHAKE128  | 1.9031 µs  | 50.560 µs     | 30.849 µs        | 39.180 µs        |
+| XOF with length      | HKDF-SHA256*   | 8.7060 µs  | 52.993 µs     | 33.414 µs        | 41.735 µs        |
 
 ("HKDF-SHA256*" meaning "HKDF used as an XOF": The "absorb" operation
 corresponds to feeding IKM data into the Extract HMAC.  The "squeeze" operation
