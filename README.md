@@ -36,14 +36,20 @@ Environment:
 
 Measurements reflect the mean value measured by Criterion.
 
-| Key schedule variant | KDF / XOF      | Time per iteration | X225519 Encap | ML-KEM-768 Encap | ML-KEM-768 Decap |
-|----------------------|----------------|--------------------|---------------|------------------|------------------|
-| RFC                  | HKDF-SHA256    | 13.018 µs          | 56.667 µs     | 37.105 µs        | 44.695 µs        |
-| RFC                  | HKDF-SHA3\_256 | 10.621 µs          | 57.520 µs     | 38.055 µs        | 45.664 µs        |
-| XOF with label       | SHAKE128       | 4.3673 µs          | 51.536 µs     | 32.161 µs        | 39.674 µs        |
-| XOF with label       | TurboSHAKE128  | 2.3762 µs          | 50.927 µs     | 31.276 µs        | 38.878 µs        |
-| XOF with length      | SHAKE128       | 3.4692 µs          | 50.662 µs     | 31.134 µs        | 38.734 µs        |
-| XOF with length      | TurboSHAKE128  | 1.8673 µs          | 50.337 µs     | 31.418 µs        | 39.069 µs        |
+| Key schedule variant | KDF / XOF      | Raw        | X225519 Encap | ML-KEM-768 Encap | ML-KEM-768 Decap |
+|----------------------|----------------|------------|---------------|------------------|------------------|
+| RFC                  | HKDF-SHA256    | 13.018 µs  | 56.667 µs     | 37.105 µs        | 44.695 µs        |
+| RFC                  | HKDF-SHA3\_256 | 10.621 µs  | 57.520 µs     | 38.055 µs        | 45.664 µs        |
+| XOF with label       | SHAKE128       | 4.3673 µs  | 51.536 µs     | 32.161 µs        | 39.674 µs        |
+| XOF with label       | TurboSHAKE128  | 2.3762 µs  | 50.927 µs     | 31.276 µs        | 38.878 µs        |
+| XOF with label       | HKDF-SHA256*   | 10.065 µs  | 54.467 µs     | 35.387 µs        | 43.539 µs        |
+| XOF with length      | SHAKE128       | 3.4692 µs  | 50.662 µs     | 31.134 µs        | 38.734 µs        |
+| XOF with length      | TurboSHAKE128  | 1.8673 µs  | 50.337 µs     | 31.418 µs        | 39.069 µs        |
+| XOF with length      | HKDF-SHA256*   | 8.5668 µs  | 52.401 µs     | 33.041 µs        | 41.301 µs        |
+
+("HKDF-SHA256*" meaning "HKDF used as an XOF": The "absorb" operation
+corresponds to feeding IKM data into the Extract HMAC.  The "squeeze" operation
+corresponds to Expand.  The Salt and Info inputs are empty.)
 
 [discussed]: https://mailarchive.ietf.org/arch/msg/cfrg/zwpQRXtlqnPC0QzJ1-pNbz5ohcM/
 [suggested by Deirdre]: https://datatracker.ietf.org/doc/draft-connolly-cfrg-sha3-hpke

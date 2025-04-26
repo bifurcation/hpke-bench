@@ -510,8 +510,10 @@ mod test {
 
         test::<DhkemX25519HkdfSha256, XofWithLabel<Shake128>, ChaCha20Poly1305>();
         test::<DhkemX25519HkdfSha256, XofWithLabel<TurboShake128>, ChaCha20Poly1305>();
+        test::<DhkemX25519HkdfSha256, XofWithLabel<HkdfSha256Xof>, ChaCha20Poly1305>();
 
         test::<DhkemX25519HkdfSha256, XofFlat<Shake128>, ChaCha20Poly1305>();
         test::<DhkemX25519HkdfSha256, XofFlat<TurboShake128>, ChaCha20Poly1305>();
+        test::<DhkemX25519HkdfSha256, XofFlat<HkdfSha256Xof>, ChaCha20Poly1305>();
     }
 }

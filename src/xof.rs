@@ -113,3 +113,46 @@ impl Xof for TurboShake128 {
         }
     }
 }
+
+use hmac::Mac;
+
+// Let's use HKDF like an XOF!
+#[derive(Clone)]
+pub struct HkdfSha256Xof(Option<hmac::Hmac<sha2::Sha256>>);
+
+impl Default for HkdfSha256Xof {
+    fn default() -> Self {
+        Self(Some(hmac::Hmac::new_from_slice(&[]).unwrap()))
+    }
+}
+
+impl Xof for HkdfSha256Xof {
+    const ID: [u8; 2] = [0x00, 0x02];
+    const N_H: usize = 32;
+
+    // We treat the totality of the absorb() calls as the `ikm` input.
+    fn absorb(&mut self, data: &[u8]) -> &mut Self {
+        let Some(mac) = &mut self.0 else {
+            unreachable!();
+        };
+
+        Mac::update(mac, data);
+        self
+    }
+
+    // In principle, we could allow multiple squeezes, but this would requires
+    fn squeeze(&mut self, len: usize) -> Vec<u8> {
+        let Some(mac) = &mut self.0 else {
+            unreachable!();
+        };
+
+        let prk = mac.clone().finalize().into_bytes();
+        let hkdf = hkdf::Hkdf::<sha2::Sha256>::from_prk(prk.as_slice()).unwrap();
+
+        let mut data = vec![0; len];
+        hkdf.expand(&[], &mut data).unwrap();
+
+        self.0 = None;
+        data
+    }
+}
