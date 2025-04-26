@@ -10,7 +10,7 @@ The core change involved is in the `KeySchedule` function, and in particular,
 the way that the `key`, `base_nonce`, and `exporter_secret` values are derived
 from the inputs.  In this experiment, we compare three variations:
 
-* Integrating SHA-3 via HPKE (as [suggested by Dierdre])
+* Integrating SHA-3 via HPKE (as [suggested by Deirdre])
 * An XOF-based approach with derivation labels (as [suggested by Sophie])
 * An XOF-based approach with length-separated outputs (my own invention)
 
@@ -18,7 +18,7 @@ These are benchmarked separately and in the context of HPKE.  For the latter
 measurement, we use DHKEM(X25519, HKDF-SHA256) as the KEM, because this is
 empirically the fastest of the registered KEMs, and thus will show any key
 schedule differences to their greatest advantage.  Also looked at ML-KEM-768
-because [Dierdre asked].
+because [Deirdre asked].
 
 # Local Measurement Results
 
@@ -46,6 +46,6 @@ Measurements reflect the mean value measured by Criterion.
 | XOF with length      | TurboSHAKE128  | 1.8673 µs          | 50.337 µs     | 31.418 µs        | 39.069 µs        |
 
 [discussed]: https://mailarchive.ietf.org/arch/msg/cfrg/zwpQRXtlqnPC0QzJ1-pNbz5ohcM/
-[suggested by Dierdre]: https://datatracker.ietf.org/doc/draft-connolly-cfrg-sha3-hpke
+[suggested by Deirdre]: https://datatracker.ietf.org/doc/draft-connolly-cfrg-sha3-hpke
 [suggested by Sophie]: https://mailarchive.ietf.org/arch/msg/cfrg/3RzIoQs0u5aw-uywoQQoY2gJtbM/
-[Dierdre asked]: https://mailarchive.ietf.org/arch/msg/cfrg/hUUdjQYZt0ZRwGTAAhlt7UkK25Q/
+[Deirdre asked]: https://mailarchive.ietf.org/arch/msg/cfrg/hUUdjQYZt0ZRwGTAAhlt7UkK25Q/
