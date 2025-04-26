@@ -31,8 +31,8 @@ Environment:
 * MacBook M1 Pro, vintage 2021
 * Rust 1.85.1
 * Rust Crypto and X25519-Dalek used for underlying primitives
-* Weather: 25C and cloudy
-* Moon phase: Waning crescent, 7% illumination
+* ☁️  Weather: 25C and cloudy 
+* 🌘 Moon phase: Waning crescent, 7% illumination
 
 Measurements reflect the mean value measured by Criterion.
 
