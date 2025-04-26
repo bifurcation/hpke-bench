@@ -45,15 +45,6 @@ Measurements reflect the mean value measured by Criterion.
 | XOF with length      | SHAKE128       | 3.4692 µs          | 50.662 µs     | 31.134 µs        | 38.734 µs        |
 | XOF with length      | TurboSHAKE128  | 1.8673 µs          | 50.337 µs     | 31.418 µs        | 39.069 µs        |
 
-
-m_sha2_encap              37.105 µs 44.695 µs
-m_sha3_encap              38.055 µs 45.664 µs
-m_shake_label_encap       32.161 µs 39.674 µs
-m_turboshake_label_encap  31.276 µs 38.878 µs
-m_shake_flat_encap        31.134 µs 38.734 µs
-m_turboshake_flat_encap   31.418 µs 39.069 µs
-
-
 [discussed]: https://mailarchive.ietf.org/arch/msg/cfrg/zwpQRXtlqnPC0QzJ1-pNbz5ohcM/
 [suggested by Dierdre]: https://datatracker.ietf.org/doc/draft-connolly-cfrg-sha3-hpke
 [suggested by Sophie]: https://mailarchive.ietf.org/arch/msg/cfrg/3RzIoQs0u5aw-uywoQQoY2gJtbM/
